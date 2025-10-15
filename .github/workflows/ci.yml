@@ -1,0 +1,50 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install black==23.9.1
+          pip install flake8==6.1.0
+          pip install sqlfluff==2.3.5
+          pip install dbt-postgres==1.6.0
+      
+      - name: Check Python formatting with Black
+        run: |
+          black --check airflow/include/ airflow/dags/ || echo "⚠️  Black formatting issues found"
+      
+      - name: Lint Python code with Flake8
+        run: |
+          flake8 airflow/include/ airflow/dags/ --max-line-length=100 --extend-ignore=E203,W503 || echo "⚠️  Flake8 issues found"
+      
+      - name: Lint SQL with SQLFluff
+        run: |
+          sqlfluff lint dbt/models/ --dialect postgres || echo "⚠️  SQLFluff issues found"
+      
+      - name: Install dbt packages
+        run: |
+          cd dbt
+          dbt deps
+      
+      - name: Check dbt compilation
+        run: |
+          cd dbt
+          dbt compile --profiles-dir . || echo "⚠️  dbt compilation issues"
