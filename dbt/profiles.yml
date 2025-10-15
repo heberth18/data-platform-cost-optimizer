@@ -1,0 +1,12 @@
+customer_risk_analytics:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: postgres
+      user: dataeng
+      password: dataeng123
+      port: 5432
+      dbname: data_platform
+      schema: analytics
+      threads: 4

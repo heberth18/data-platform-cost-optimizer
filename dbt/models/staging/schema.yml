@@ -1,0 +1,163 @@
+version: 2
+
+sources:
+  - name: staging
+    database: data_platform
+    schema: staging
+    tables:
+      - name: raw_customers
+        description: "Raw customer data from API"
+        columns:
+          - name: customer_id
+            description: "Unique customer identifier"
+            tests:
+              - unique
+              - not_null
+          - name: email
+            description: "Customer email"
+          - name: first_name
+            description: "First name"
+          - name: last_name
+            description: "Last name"
+      
+      - name: raw_orders
+        description: "Order line items"
+        columns:
+          - name: order_id
+            description: "order line ID"
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: "Reference to customer"
+            tests:
+              - not_null
+              - relationships:
+                  to: source('staging', 'raw_customers')
+                  field: customer_id
+          - name: quantity
+            description: "Product quantity"
+            tests:
+              - not_null
+          - name: price
+            description: "Product price"
+            tests:
+              - not_null
+      
+      - name: fraud_scores
+        description: "Fraud risk scores"
+        columns:
+          - name: fraud_score_id
+            description: "Fraud score ID"
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: "Reference to customer"
+            tests:
+              - not_null
+              - relationships:
+                  to: source('staging', 'raw_customers')
+                  field: customer_id
+          - name: composite_risk_score
+            description: "Composite risk score (0.0 to 1.0)"
+            tests:
+              - not_null
+          - name: risk_level
+            description: "Risk classification: low, medium, high, critical"
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['low', 'medium', 'high', 'critical']
+
+models:
+  - name: stg_customer_profiles
+    description: "Customer profiles"
+    columns:
+      - name: customer_id
+        description: "Unique customer identifier"
+        tests:
+          - unique
+          - not_null
+      - name: full_name
+        description: "Full name"
+        tests:
+          - not_null
+      - name: email
+        description: "Email address"
+        tests:
+          - not_null
+      - name: phone
+        description: "Phone number"
+      - name: age
+        description: "Customer age"
+  
+  - name: stg_orders
+    description: "Order line items"
+    columns:
+      - name: order_id
+        description: "Unique order line ID"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "Reference to customer"
+        tests:
+          - not_null
+      - name: line_total
+        description: "Line item total"
+        tests:
+          - not_null
+
+  - name: stg_customer_metrics
+    description: "Customer-level aggregated metrics from orders"
+    columns:
+      - name: customer_id
+        description: "Unique customer identifier"
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_customer_profiles')
+              field: customer_id
+      
+      - name: full_name
+        description: "Customer full name"
+        tests:
+          - not_null
+      
+      - name: email
+        description: "Customer email"
+        tests:
+          - not_null
+      
+      - name: age
+        description: "Customer age"
+        tests:
+          - dbt_utils.accepted_range:
+              min_value: 18
+              max_value: 120
+      
+      - name: total_orders
+        description: "Total number of orders"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 10000
+      
+      - name: total_spent
+        description: "Total amount spent"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 1000000
+      
+      - name: avg_order_value
+        description: "Average order value"
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 100000
