@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Dict, Any, List, Tuple
 import logging
 import json
+from decimal import Decimal
 
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
@@ -13,6 +14,12 @@ from .monitoring import track_performance_metrics
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+def decimal_to_float(obj):
+    """Convert Decimal objects to float for JSON serialization"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 # Data quality thresholds based on business requirements
 QUALITY_THRESHOLDS = {
@@ -315,7 +322,7 @@ def _generate_validation_summary(
             'pipeline_continue': quality_summary['pipeline_should_continue'],
             'checks_detail': quality_checks
         }
-    }))
+    }, default=decimal_to_float))
     
     # Fail pipeline if critical issues found
     if not quality_summary['pipeline_should_continue']:

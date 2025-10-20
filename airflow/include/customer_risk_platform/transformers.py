@@ -5,6 +5,78 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 logger = logging.getLogger(__name__)
 
+def _get_region_from_country(country: str) -> str:
+    """
+    Map country to geographic region for business analytics.
+    More realistic than random assignment.
+    """
+    region_mapping = {
+        # North America
+        'United States': 'NORTH_AMERICA',
+        'Canada': 'NORTH_AMERICA',
+        'Mexico': 'NORTH_AMERICA',
+        
+        # South America
+        'Brazil': 'SOUTH_AMERICA',
+        'Argentina': 'SOUTH_AMERICA',
+        'Chile': 'SOUTH_AMERICA',
+        'Colombia': 'SOUTH_AMERICA',
+        'Peru': 'SOUTH_AMERICA',
+        
+        # Europe
+        'United Kingdom': 'EUROPE',
+        'Germany': 'EUROPE',
+        'France': 'EUROPE',
+        'Spain': 'EUROPE',
+        'Italy': 'EUROPE',
+        'Netherlands': 'EUROPE',
+        'Poland': 'EUROPE',
+        'Sweden': 'EUROPE',
+        'Norway': 'EUROPE',
+        'Denmark': 'EUROPE',
+        'Belgium': 'EUROPE',
+        'Austria': 'EUROPE',
+        'Switzerland': 'EUROPE',
+        'Ireland': 'EUROPE',
+        'Portugal': 'EUROPE',
+        'Greece': 'EUROPE',
+        'Czech Republic': 'EUROPE',
+        'Finland': 'EUROPE',
+        
+        # Asia
+        'China': 'ASIA',
+        'Japan': 'ASIA',
+        'India': 'ASIA',
+        'South Korea': 'ASIA',
+        'Singapore': 'ASIA',
+        'Thailand': 'ASIA',
+        'Vietnam': 'ASIA',
+        'Indonesia': 'ASIA',
+        'Malaysia': 'ASIA',
+        'Philippines': 'ASIA',
+        'Pakistan': 'ASIA',
+        'Bangladesh': 'ASIA',
+        'Taiwan': 'ASIA',
+        
+        # Oceania
+        'Australia': 'OCEANIA',
+        'New Zealand': 'OCEANIA',
+        
+        # Middle East
+        'United Arab Emirates': 'MIDDLE_EAST',
+        'Saudi Arabia': 'MIDDLE_EAST',
+        'Israel': 'MIDDLE_EAST',
+        'Turkey': 'MIDDLE_EAST',
+        
+        # Africa
+        'South Africa': 'AFRICA',
+        'Nigeria': 'AFRICA',
+        'Egypt': 'AFRICA',
+        'Kenya': 'AFRICA',
+        'Morocco': 'AFRICA'
+    }
+    
+    return region_mapping.get(country, 'OTHER')
 
 def _save_raw_customers_to_staging(customers: List[Dict]) -> None:
     """Save raw customer data to staging (NO CLEANING)"""
@@ -109,7 +181,7 @@ def _save_raw_orders_to_staging(orders: List[Dict]) -> None:
         insert_sql = """
         INSERT INTO staging.raw_orders 
         (cart_id, customer_id, product_id, product_name, product_category,
-        quantity, price, discount_percentage, line_total)
+        quantity, price, discount_percentage, line_total, region)
         VALUES %s;
         """
         
@@ -123,7 +195,8 @@ def _save_raw_orders_to_staging(orders: List[Dict]) -> None:
                 o['quantity'],
                 o['price'],
                 o.get('discount_percentage', 0),
-                o['line_total']
+                o['line_total'],
+                o.get('region', 'OTHER') 
             )
             for o in filtered_orders
         ]
@@ -186,15 +259,22 @@ def _flatten_users_data(raw_users: List[Dict]) -> List[Dict]:
     
     return flattened
 
-
-def _flatten_carts_data(raw_carts: List[Dict]) -> List[Dict]:
-    """Flatten cart data into individual order lines"""
+def _flatten_carts_data(raw_carts: List[Dict], users_lookup: Dict[int, Dict]) -> List[Dict]:
+    """
+    Flatten cart data into individual order lines.
+    Includes region based on customer country.
+    """
     orders = []
     
     for cart in raw_carts:
         try:
             cart_id = cart.get('id')
             customer_id = cart.get('userId')
+            
+            # Get customer data to infer region
+            user = users_lookup.get(customer_id, {})
+            country = user.get('address', {}).get('country', '')
+            region = _get_region_from_country(country)
             
             for product in cart.get('products', []):
                 order = {
@@ -206,7 +286,8 @@ def _flatten_carts_data(raw_carts: List[Dict]) -> List[Dict]:
                     'quantity': product.get('quantity', 1),
                     'price': product.get('price', 0),
                     'discount_percentage': product.get('discountPercentage', 0),
-                    'line_total': product.get('price', 0) * product.get('quantity', 1) * (1 - product.get('discountPercentage', 0)/100)
+                    'line_total': product.get('price', 0) * product.get('quantity', 1) * (1 - product.get('discountPercentage', 0)/100),
+                    'region': region    
                 }
                 orders.append(order)
                 
@@ -215,7 +296,6 @@ def _flatten_carts_data(raw_carts: List[Dict]) -> List[Dict]:
             continue
     
     return orders
-
 
 def transform_clean_data(**context) -> Dict[str, Any]:
     """
@@ -243,7 +323,11 @@ def transform_clean_data(**context) -> Dict[str, Any]:
         
         # Step 1: Flatten nested JSON structures
         flattened_customers = _flatten_users_data(raw_users)
-        flattened_orders = _flatten_carts_data(raw_carts)
+
+        # Create user lookup for region mapping
+        users_lookup = {user['id']: user for user in raw_users}
+
+        flattened_orders = _flatten_carts_data(raw_carts, users_lookup)
         
         logger.info(f"Flattened: {len(flattened_customers)} customers, {len(flattened_orders)} orders")
         

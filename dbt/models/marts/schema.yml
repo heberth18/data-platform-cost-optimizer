@@ -28,11 +28,11 @@ models:
               values: ['premium', 'regular', 'new']
       
       - name: value_tier
-        description: "Value tier classification"
+        description: "Value value classification"
         tests:
           - not_null
           - accepted_values:
-              values: ['VIP', 'Medium Value', 'Standard']
+              values: ['VIP', 'High Value', 'Medium Value', 'Standard']
       
       - name: total_spent
         description: "Total lifetime value"
@@ -119,18 +119,18 @@ models:
           - not_null
       
       - name: customer_tier
-        description: "Customer tier classification"
+        description: "High-value customer tier classification"
         tests:
           - not_null
           - accepted_values:
-              values: ['Tier 1 - VIP', 'Tier 2 - High Value', 'Tier 3 - Regular']
+              values: ['Tier 1 - VIP', 'Tier 2 - Premium', 'Tier 3 - Gold']
       
       - name: retention_status
-        description: "Retention risk status"
+        description: "Customer retention risk category"
         tests:
           - not_null
           - accepted_values:
-              values: ['New Customer - Retention Risk', 'Stable Customer', 'At Risk Customer']
+              values: ['New Customer - Retention Risk', 'Stable', 'Low Engagement']
       
       - name: total_spent
         description: "Total lifetime value"

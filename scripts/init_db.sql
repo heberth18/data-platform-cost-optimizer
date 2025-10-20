@@ -2,49 +2,9 @@
 -- This script runs automatically when PostgreSQL container starts
 
 -- Create schemas for different data layers
-CREATE SCHEMA IF NOT EXISTS raw_data;
 CREATE SCHEMA IF NOT EXISTS staging;
 CREATE SCHEMA IF NOT EXISTS analytics;
 CREATE SCHEMA IF NOT EXISTS monitoring;
-
--- Create raw data tables
-CREATE TABLE IF NOT EXISTS raw_data.sales_data (
-    id SERIAL PRIMARY KEY,
-    transaction_id VARCHAR(50),
-    customer_id VARCHAR(50),
-    product_id VARCHAR(50),
-    quantity INTEGER,
-    price DECIMAL(10,2),
-    transaction_date TIMESTAMP,
-    region VARCHAR(50),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create staging tables
-CREATE TABLE IF NOT EXISTS staging.sales_clean (
-    id SERIAL PRIMARY KEY,
-    transaction_id VARCHAR(50) NOT NULL,
-    customer_id VARCHAR(50) NOT NULL,
-    product_id VARCHAR(50) NOT NULL,
-    quantity INTEGER CHECK (quantity > 0),
-    price DECIMAL(10,2) CHECK (price > 0),
-    transaction_date DATE NOT NULL,
-    region VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Create analytics tables
-CREATE TABLE IF NOT EXISTS analytics.daily_sales_summary (
-    id SERIAL PRIMARY KEY,
-    date DATE NOT NULL,
-    region VARCHAR(50) NOT NULL,
-    total_revenue DECIMAL(12,2),
-    total_transactions INTEGER,
-    average_order_value DECIMAL(10,2),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(date, region)
-);
 
 -- Create monitoring tables for cost tracking
 CREATE TABLE IF NOT EXISTS monitoring.pipeline_costs (
@@ -58,26 +18,10 @@ CREATE TABLE IF NOT EXISTS monitoring.pipeline_costs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_sales_data_date ON raw_data.sales_data(transaction_date);
-CREATE INDEX IF NOT EXISTS idx_sales_clean_date ON staging.sales_clean(transaction_date);
-CREATE INDEX IF NOT EXISTS idx_daily_summary_date ON analytics.daily_sales_summary(date);
-
--- Insert sample data for testing
-INSERT INTO raw_data.sales_data (transaction_id, customer_id, product_id, quantity, price, transaction_date, region) VALUES
-('TXN001', 'CUST001', 'PROD001', 2, 25.99, '2024-01-15 10:30:00', 'North'),
-('TXN002', 'CUST002', 'PROD002', 1, 149.99, '2024-01-15 11:45:00', 'South'),
-('TXN003', 'CUST003', 'PROD001', 3, 25.99, '2024-01-15 14:20:00', 'East'),
-('TXN004', 'CUST001', 'PROD003', 1, 75.50, '2024-01-16 09:15:00', 'North'),
-('TXN005', 'CUST004', 'PROD002', 2, 149.99, '2024-01-16 16:30:00', 'West')
-ON CONFLICT DO NOTHING;
-
 -- Grant permissions
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA raw_data TO dataeng;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA staging TO dataeng;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA analytics TO dataeng;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA monitoring TO dataeng;
-GRANT USAGE ON ALL SEQUENCES IN SCHEMA raw_data TO dataeng;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA staging TO dataeng;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA analytics TO dataeng;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA monitoring TO dataeng;
@@ -127,6 +71,7 @@ CREATE TABLE IF NOT EXISTS staging.raw_orders (
     price NUMERIC(10,2),
     discount_percentage NUMERIC(5,2),
     line_total NUMERIC(10,2),
+    region VARCHAR(50),
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
